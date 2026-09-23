@@ -3,8 +3,9 @@ import sqlite3
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+from ..config import CATEGORIES, get_locations
 from ..database import get_db
-from ..schemas import Observation, ObservationCreate
+from ..schemas import Observation, ObservationCreate, ObservationMetadata
 
 router = APIRouter(prefix="/observations", tags=["observations"])
 
@@ -17,7 +18,16 @@ def _row_to_observation(row: sqlite3.Row) -> Observation:
         category=row["category"],
         severity=row["severity"],
         description=row["description"],
+        observed_at=datetime.fromisoformat(row["observed_at"]) if row["observed_at"] else None,
+        approximate_location_id=row["approximate_location_id"],
+        crowd_level=row["crowd_level"],
+        environmental_rating=row["environmental_rating"],
     )
+
+
+@router.get("/metadata", response_model=ObservationMetadata)
+def observation_metadata() -> ObservationMetadata:
+    return ObservationMetadata(categories=list(CATEGORIES), locations=list(get_locations()))
 
 
 @router.post("", response_model=Observation, status_code=status.HTTP_201_CREATED)
@@ -29,10 +39,22 @@ def create_observation(
     try:
         cursor = connection.execute(
             """
-            INSERT INTO observations (created_at, location, category, severity, description)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO observations (
+                created_at, location, category, severity, description, observed_at,
+                approximate_location_id, crowd_level, environmental_rating
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (created_at, payload.location, payload.category, payload.severity, payload.description),
+            (
+                created_at,
+                payload.location,
+                payload.category.value,
+                payload.severity,
+                payload.description,
+                payload.observed_at.isoformat() if payload.observed_at else None,
+                payload.approximate_location_id,
+                payload.crowd_level,
+                payload.environmental_rating,
+            ),
         )
         connection.commit()
         row = connection.execute(

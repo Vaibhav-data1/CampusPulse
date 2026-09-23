@@ -1,5 +1,3 @@
-import os
-
 import pytest
 from fastapi.testclient import TestClient
 
@@ -37,6 +35,60 @@ def test_create_and_list_observation(client):
     listed = client.get("/api/v1/observations", params={"category": "Noise"})
     assert listed.status_code == 200
     assert len(listed.json()) == 1
+
+
+def test_valid_structured_observation(client):
+    response = client.post(
+        "/api/v1/observations",
+        json={
+            "location": "Library",
+            "category": "Crowding",
+            "severity": 3,
+            "description": "Study area is busy.",
+            "observed_at": "2026-09-23T10:30:00Z",
+            "approximate_location_id": "library-west-wing",
+            "crowd_level": 5,
+            "environmental_rating": 4,
+        },
+    )
+    assert response.status_code == 201
+    body = response.json()
+    assert body["crowd_level"] == 5
+    assert body["environmental_rating"] == 4
+    assert body["approximate_location_id"] == "library-west-wing"
+
+
+def test_invalid_category_is_rejected(client):
+    response = client.post(
+        "/api/v1/observations",
+        json={"location": "Library", "category": "Food Quality", "severity": 2, "description": "Nope"},
+    )
+    assert response.status_code == 422
+
+
+def test_invalid_rating_is_rejected(client):
+    response = client.post(
+        "/api/v1/observations",
+        json={
+            "location": "Library",
+            "category": "Facilities",
+            "severity": 2,
+            "description": "Invalid crowd rating.",
+            "crowd_level": 6,
+        },
+    )
+    assert response.status_code == 422
+
+
+def test_metadata_endpoint(client):
+    response = client.get("/api/v1/observations/metadata")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["categories"] == [
+        "Wi-Fi / Connectivity", "Crowding", "Cleanliness", "Noise",
+        "Maintenance", "Safety", "Facilities", "Other",
+    ]
+    assert "Library" in body["locations"]
 
 
 def test_validation_rejects_invalid_severity(client):

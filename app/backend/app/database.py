@@ -36,8 +36,30 @@ def init_db() -> None:
                 location TEXT NOT NULL,
                 category TEXT NOT NULL,
                 severity INTEGER NOT NULL CHECK (severity BETWEEN 1 AND 5),
-                description TEXT NOT NULL
+                description TEXT NOT NULL,
+                observed_at TEXT,
+                approximate_location_id TEXT,
+                crowd_level INTEGER CHECK (crowd_level IS NULL OR crowd_level BETWEEN 1 AND 5),
+                environmental_rating INTEGER CHECK (
+                    environmental_rating IS NULL OR environmental_rating BETWEEN 1 AND 5
+                )
             )
             """
         )
+        columns = {
+            row["name"] for row in connection.execute("PRAGMA table_info(observations)")
+        }
+        migrations = {
+            "observed_at": "ALTER TABLE observations ADD COLUMN observed_at TEXT",
+            "approximate_location_id": (
+                "ALTER TABLE observations ADD COLUMN approximate_location_id TEXT"
+            ),
+            "crowd_level": "ALTER TABLE observations ADD COLUMN crowd_level INTEGER",
+            "environmental_rating": (
+                "ALTER TABLE observations ADD COLUMN environmental_rating INTEGER"
+            ),
+        }
+        for column, statement in migrations.items():
+            if column not in columns:
+                connection.execute(statement)
         connection.commit()
