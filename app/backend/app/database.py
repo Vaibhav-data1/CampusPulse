@@ -13,7 +13,7 @@ def get_database_path() -> Path:
 def get_connection() -> sqlite3.Connection:
     path = get_database_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    connection = sqlite3.connect(path)
+    connection = sqlite3.connect(path, check_same_thread=False)
     connection.row_factory = sqlite3.Row
     return connection
 

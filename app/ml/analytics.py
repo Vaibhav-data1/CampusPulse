@@ -5,16 +5,18 @@ import pandas as pd
 
 def _datetime_series(df: pd.DataFrame) -> pd.Series:
     if df.empty:
-        return pd.Series([], dtype="datetime64[ns]")
+        return pd.Series([], dtype="datetime64[ns, UTC]")
 
     if "observed_at" in df.columns:
         source = "observed_at"
     elif "created_at" in df.columns:
         source = "created_at"
     else:
-        return pd.Series([], dtype="datetime64[ns]")
+        return pd.Series([], dtype="datetime64[ns, UTC]")
 
-    return pd.to_datetime(df[source], errors="coerce")
+    # UTC normalization also makes mixed aware/naive input safe; pandas
+    # interprets naive values as UTC when utc=True.
+    return pd.to_datetime(df[source], errors="coerce", utc=True)
 
 
 def counts_by_category(df: pd.DataFrame) -> pd.DataFrame:
@@ -25,7 +27,7 @@ def counts_by_category(df: pd.DataFrame) -> pd.DataFrame:
     counts = (
         df["category"].dropna().astype(str).value_counts().rename_axis("category").reset_index(name="observation_count")
     )
-    return counts.sort_values("observation_count", ascending=False).reset_index(drop=True)
+    return counts.sort_values("observation_count", ascending=False, kind="stable").reset_index(drop=True)
 
 
 def counts_by_location(df: pd.DataFrame) -> pd.DataFrame:
@@ -36,7 +38,7 @@ def counts_by_location(df: pd.DataFrame) -> pd.DataFrame:
     counts = (
         df["location"].dropna().astype(str).value_counts().rename_axis("location").reset_index(name="observation_count")
     )
-    return counts.sort_values("observation_count", ascending=False).reset_index(drop=True)
+    return counts.sort_values("observation_count", ascending=False, kind="stable").reset_index(drop=True)
 
 
 def average_severity_by_category(df: pd.DataFrame) -> pd.DataFrame:
@@ -48,7 +50,9 @@ def average_severity_by_category(df: pd.DataFrame) -> pd.DataFrame:
         df[["category", "severity"]].dropna().groupby("category", dropna=False)["severity"].mean().reset_index()
     )
     summary = summary.rename(columns={"severity": "average_severity"})
-    return summary.sort_values("average_severity", ascending=False).reset_index(drop=True)
+    return summary.sort_values(
+        ["average_severity", "category"], ascending=[False, True], kind="stable"
+    ).reset_index(drop=True)
 
 
 def average_severity_by_location(df: pd.DataFrame) -> pd.DataFrame:
@@ -60,7 +64,9 @@ def average_severity_by_location(df: pd.DataFrame) -> pd.DataFrame:
         df[["location", "severity"]].dropna().groupby("location", dropna=False)["severity"].mean().reset_index()
     )
     summary = summary.rename(columns={"severity": "average_severity"})
-    return summary.sort_values("average_severity", ascending=False).reset_index(drop=True)
+    return summary.sort_values(
+        ["average_severity", "location"], ascending=[False, True], kind="stable"
+    ).reset_index(drop=True)
 
 
 def average_crowd_level_by_location(df: pd.DataFrame) -> pd.DataFrame:
@@ -72,7 +78,9 @@ def average_crowd_level_by_location(df: pd.DataFrame) -> pd.DataFrame:
         df[["location", "crowd_level"]].dropna().groupby("location", dropna=False)["crowd_level"].mean().reset_index()
     )
     summary = summary.rename(columns={"crowd_level": "average_crowd_level"})
-    return summary.sort_values("average_crowd_level", ascending=False).reset_index(drop=True)
+    return summary.sort_values(
+        ["average_crowd_level", "location"], ascending=[False, True], kind="stable"
+    ).reset_index(drop=True)
 
 
 def average_environmental_rating_by_location(df: pd.DataFrame) -> pd.DataFrame:
@@ -84,7 +92,9 @@ def average_environmental_rating_by_location(df: pd.DataFrame) -> pd.DataFrame:
         df[["location", "environmental_rating"]].dropna().groupby("location", dropna=False)["environmental_rating"].mean().reset_index()
     )
     summary = summary.rename(columns={"environmental_rating": "average_environmental_rating"})
-    return summary.sort_values("average_environmental_rating", ascending=False).reset_index(drop=True)
+    return summary.sort_values(
+        ["average_environmental_rating", "location"], ascending=[False, True], kind="stable"
+    ).reset_index(drop=True)
 
 
 def time_of_day_patterns(df: pd.DataFrame) -> pd.DataFrame:
@@ -119,11 +129,16 @@ def daily_weekly_trends(df: pd.DataFrame) -> pd.DataFrame:
     )
     daily["period_type"] = "daily"
     weekly = (
-        valid.dt.to_period("W-MON").apply(lambda value: value.start_time).value_counts().rename_axis("period_start").reset_index(name="observation_count")
+        valid.dt.tz_localize(None)
+        .dt.to_period("W-MON")
+        .apply(lambda value: value.start_time)
+        .value_counts()
+        .rename_axis("period_start")
+        .reset_index(name="observation_count")
     )
     weekly["period_type"] = "weekly"
     result = pd.concat([daily, weekly], ignore_index=True)
-    result["period_start"] = pd.to_datetime(result["period_start"]).dt.strftime("%Y-%m-%d")
+    result["period_start"] = pd.to_datetime(result["period_start"], utc=True).dt.strftime("%Y-%m-%d")
     result = result[["period_type", "period_start", "observation_count"]]
     return result.sort_values(["period_type", "period_start"], ascending=[True, True]).reset_index(drop=True)
 
@@ -142,7 +157,11 @@ def location_category_hotspots(df: pd.DataFrame) -> pd.DataFrame:
     average_severity = subset.groupby(["location", "category"])["severity"].mean().rename("average_severity")
     result = counts.to_frame().join(average_severity).reset_index()
     result["severity_score"] = result["observation_count"] * result["average_severity"]
-    result = result.sort_values(["severity_score", "observation_count", "average_severity"], ascending=[False, False, False])
+    result = result.sort_values(
+        ["severity_score", "observation_count", "average_severity", "location", "category"],
+        ascending=[False, False, False, True, True],
+        kind="stable",
+    )
     return result.reset_index(drop=True)
 
 

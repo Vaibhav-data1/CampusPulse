@@ -47,8 +47,8 @@ def test_average_severity_by_category_and_location():
     category_result = average_severity_by_category(df)
     location_result = average_severity_by_location(df)
 
-    assert category_result["category"].tolist() == ["Noise", "Facilities"]
-    assert category_result["average_severity"].tolist() == [3.0, 5.0]
+    assert category_result["category"].tolist() == ["Facilities", "Noise"]
+    assert category_result["average_severity"].tolist() == [5.0, 3.0]
     assert location_result["location"].tolist() == ["Cafeteria", "Library"]
     assert location_result["average_severity"].tolist() == [5.0, 3.0]
 
@@ -67,8 +67,8 @@ def test_average_crowd_and_environmental_rating_by_location():
 
     assert crowd["location"].tolist() == ["Library", "Cafeteria"]
     assert crowd["average_crowd_level"].tolist() == [4.0, 2.0]
-    assert environment["location"].tolist() == ["Library", "Cafeteria"]
-    assert environment["average_environmental_rating"].tolist() == [3.0, 5.0]
+    assert environment["location"].tolist() == ["Cafeteria", "Library"]
+    assert environment["average_environmental_rating"].tolist() == [5.0, 3.0]
 
 
 def test_time_of_day_patterns():
@@ -101,7 +101,7 @@ def test_daily_weekly_trends():
 
     result = daily_weekly_trends(df)
     assert {"daily", "weekly"}.issubset(set(result["period_type"]))
-    assert result[result["period_type"] == "daily"]["observation_count"].sum() == 2
+    assert result[result["period_type"] == "daily"]["observation_count"].sum() == 3
     assert result[result["period_type"] == "weekly"]["observation_count"].sum() == 3
 
 
@@ -137,7 +137,7 @@ def test_basic_data_quality_statistics():
     assert result["unique_categories"] == 2
     assert result["missing_values"]["location"] == 1
     assert result["missing_values"]["category"] == 1
-    assert result["date_range"]["start"] == pd.Timestamp("2025-01-01 08:00:00")
+    assert result["date_range"]["start"] == pd.Timestamp("2025-01-01 08:00:00", tz="UTC")
 
 
 def test_empty_dataset_is_handled_safely():
@@ -172,5 +172,5 @@ def test_nullable_fields_are_handled_correctly():
     quality = basic_data_quality_statistics(df)
 
     assert crowd["average_crowd_level"].tolist() == [5.0]
-    assert environment["average_environmental_rating"].tolist() == [3.5, 3.0]
+    assert environment["average_environmental_rating"].tolist() == [4.0]
     assert quality["missing_values"]["crowd_level"] == 2

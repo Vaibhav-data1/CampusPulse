@@ -30,6 +30,10 @@ SQLite is stored at `app/backend/campuspulse.db` by default. Set `CAMPUSPULSE_DA
 - `POST /api/v1/observations` — submit an anonymous observation
 - `GET /api/v1/observations` — retrieve observations
 - `GET /api/v1/observations/metadata` — retrieve controlled categories and locations for UI dropdowns
+- `GET /api/v1/analytics/summary` — retrieve dashboard aggregates calculated from stored observations
+- `GET /api/v1/analytics/anomalies` — identify unusual location-day patterns when enough history exists
+- `GET /api/v1/analytics/spatial` — retrieve abstract campus-zone intensity metrics; supports `?category=...`
+- `GET /api/v1/analytics/nlp` — retrieve explainable sentiment, topic, and keyword aggregates; supports `?category=...`
 
 The retrieval endpoint supports `location`, `category`, `start_date`, and `end_date` query parameters. Dates must be ISO 8601 timestamps. Results are newest first.
 
@@ -63,3 +67,10 @@ From `app/backend`:
 ```bash
 PYTHONPATH=. pytest
 ```
+
+## Synthetic demo data
+
+From the repository root, run `python scripts/seed_demo_data.py` to insert the
+reproducible development dataset. Use `python scripts/seed_demo_data.py
+--clear-demo` to remove only rows created by that generator before inserting a
+fresh set. See `docs/demo-data.md`; all generated findings are synthetic.
